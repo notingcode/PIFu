@@ -1,19 +1,25 @@
 name: PIFu
 channels:
-- pytorch
-- defaults
+  - defaults
+  - conda-forge
+  - pytorch
+  - nvidia
 dependencies:
-- opencv
-- pytorch
-- json
-- pyexr
-- cv2
-- PIL
-- skimage
-- tqdm
-- pyembree
-- shapely
-- rtree
-- xxhash
-- trimesh
-- PyOpenGL
+  - python=3.8
+  - pytorch=1.13.1=*cuda11.7*
+  - torchvision=0.14.1=*cu117*
+  - torchaudio=0.13.1=*cu117*
+  - ffmpeg
+  - freeglut
+  - numpy<=1.23.1
+  - opencv
+  - openexr
+  - pillow
+  - pyembree
+  - pyopengl
+  - rtree
+  - scikit-image
+  - shapely
+  - tqdm
+  - trimesh
+  - xxhash
