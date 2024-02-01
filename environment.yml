@@ -5,10 +5,10 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python=3.8
-  - pytorch=1.13.1=*cuda11.7*
-  - torchvision=0.14.1=*cu117*
-  - torchaudio=0.13.1=*cu117*
+  - python=3.10
+  - pytorch=*=*cuda11.8*
+  - torchvision=*=*cu118*
+  - torchaudio=*=*cu118*
   - ffmpeg
   - freeglut
   - numpy<=1.23.1
