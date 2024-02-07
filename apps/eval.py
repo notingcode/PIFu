@@ -25,7 +25,7 @@ import tqdm
 opt = BaseOptions().parse()
 
 class Evaluator:
-    def __init__(self, opt, projection_mode='orthogonal'):
+    def __init__(self, opt):
         self.opt = opt
         self.load_size = self.opt.loadSize
         self.to_tensor = transforms.Compose([
@@ -35,6 +35,8 @@ class Evaluator:
         ])
         # set cuda
         cuda = torch.device('cuda:%d' % opt.gpu_id) if torch.cuda.is_available() else torch.device('cpu')
+        # set projection mode
+        projection_mode = opt.projection_mode
 
         # create net
         netG = HGPIFuNet(opt, projection_mode).to(device=cuda)
