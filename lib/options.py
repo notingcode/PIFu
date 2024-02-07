@@ -6,13 +6,15 @@ class BaseOptions():
     def __init__(self):
         self.initialized = False
 
-    def initialize(self, parser):
+    def initialize(self, parser: argparse.ArgumentParser):
         # Datasets related
         g_data = parser.add_argument_group('Data')
         g_data.add_argument('--dataroot', type=str, default='./data',
                             help='path to images (data folder)')
 
         g_data.add_argument('--loadSize', type=int, default=512, help='load size of input image')
+        g_data.add_argument('--yaw_list', nargs='+', default=[4, 16, 28, 40, 52, 64, 76, 88], type=int,
+                            help='Specify the yaw index of view around all subject')
 
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
@@ -33,7 +35,7 @@ class BaseOptions():
                              help='if true, takes images in order to make batches, otherwise takes them randomly')
         g_train.add_argument('--pin_memory', action='store_true', help='pin_memory')
         
-        g_train.add_argument('--batch_size', type=int, default=2, help='input batch size')
+        g_train.add_argument('--batch_size', type=int, default=1, help='input batch size')
         g_train.add_argument('--learning_rate', type=float, default=1e-3, help='adam learning rate')
         g_train.add_argument('--learning_rateC', type=float, default=1e-3, help='adam learning rate')
         g_train.add_argument('--num_epoch', type=int, default=100, help='num epoch to train')
@@ -85,6 +87,9 @@ class BaseOptions():
 
         g_model.add_argument('--use_tanh', action='store_true',
                              help='using tanh after last conv of image_filter network')
+
+        g_model.add_argument('--projection_mode', type=str, default='perspective',
+                             help='projection mode of the train dataset')
 
         # for train
         parser.add_argument('--random_flip', action='store_true', help='if random flip')
