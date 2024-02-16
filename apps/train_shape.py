@@ -6,8 +6,6 @@ ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 import time
 import json
-import numpy as np
-import cv2
 import random
 import torch
 from torch.utils.data import DataLoader
@@ -19,7 +17,6 @@ from lib.sample_util import *
 from lib.train_util import *
 from lib.data import *
 from lib.model import *
-from lib.geometry import index
 
 # get options
 opt = BaseOptions().parse()
