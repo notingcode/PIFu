@@ -5,21 +5,24 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python=3.10
-  - pytorch=*=*cuda11.8*
-  - torchvision=*=*cu118*
-  - torchaudio=*=*cu118*
+  - python=3.8
+  - pytorch=*=*cuda11.7*
+  - torchvision=*=*cu117*
+  - torchaudio=*=*cu117*
   - ffmpeg
   - freeglut
+  - imageio=2.34.0
   - numpy<=1.23.1
   - opencv
   - openexr
   - pillow
-  - pyembree
   - pyopengl
   - rtree
   - scikit-image
   - shapely
   - tqdm
-  - trimesh
   - xxhash
+  - pip
+  - pip:
+    - pyembree
+    - pysdf
