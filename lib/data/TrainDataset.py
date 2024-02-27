@@ -9,6 +9,7 @@ import torch
 from PIL.ImageFilter import GaussianBlur
 import trimesh
 import logging
+from pysdf import SDF
 
 log = logging.getLogger('trimesh')
 log.setLevel(40)
@@ -75,8 +76,8 @@ class TrainDataset(Dataset):
         self.UV_POS = os.path.join(self.root, 'UV_POS')
         self.OBJ = os.path.join(self.root, 'GEO', 'OBJ')
 
-        self.B_MIN = np.array([-128, -28, -128])
-        self.B_MAX = np.array([128, 228, 128])
+        self.B_MIN = np.array(self.opt.b_min)
+        self.B_MAX = np.array(self.opt.b_max)
 
         self.is_train = (phase == 'train')
         self.load_size = self.opt.loadSize
@@ -121,7 +122,7 @@ class TrainDataset(Dataset):
     def __len__(self):
         return len(self.subjects) * len(self.yaw_list) * len(self.pitch_list)
 
-    def get_render(self, subject, num_views, yid=0, pid=0, random_sample=False):
+    def get_render(self, subject, num_views, yid=0, random_sample=False):
         '''
         Return the render data
         :param subject: subject name
@@ -162,42 +163,51 @@ class TrainDataset(Dataset):
 
             # Match camera space to image pixel space
             scale_intrinsic = np.identity(4)
-            scale_intrinsic[1, 1] *= -1
-
-            # Transform under image pixel space
-            trans_intrinsic = np.identity(4)
 
             mask = Image.open(mask_path).convert('L')
             render = Image.open(render_path).convert('RGB')
+            
+            original_img_width, original_img_height = render.size
+            
+            max_dim = max(original_img_width, original_img_height)
+            
+            mask = ImageOps.pad(mask, (max_dim, max_dim))
+            render = ImageOps.pad(render, (max_dim, max_dim))
+
+            if max_dim == original_img_height:
+                intrinsic[0, 2] += (max_dim - original_img_width)/2
+            else:
+                intrinsic[1, 2] += (max_dim - original_img_height)/2
+
+            mask = ImageOps.fit(mask, (self.load_size, self.load_size), method=Image.NEAREST)
+            render = ImageOps.fit(render, (self.load_size, self.load_size), method=Image.BILINEAR)
+
+            intrinsic[:2, :] *= (self.load_size/max_dim)
+            intrinsic[:2, 2] -= self.load_size/2
 
             if self.is_train:
-                # Initial Pad
-                render = ImageOps.pad(render, (1280, 1280), color="#000")
-                mask = ImageOps.pad(mask, (1280, 1280), color="#000")
-
                 # Pad images
                 pad_size = int(0.1 * self.load_size)
                 render = ImageOps.expand(render, pad_size, fill=0)
                 mask = ImageOps.expand(mask, pad_size, fill=0)
 
+                intrinsic[:2, 2] += pad_size
+
                 w, h = render.size
                 th, tw = self.load_size, self.load_size
 
-                # random flip
-                if self.opt.random_flip and np.random.rand() > 0.5:
-                    scale_intrinsic[0, 0] *= -1
-                    render = transforms.RandomHorizontalFlip(p=1.0)(render)
-                    mask = transforms.RandomHorizontalFlip(p=1.0)(mask)
-
                 # random scale
                 if self.opt.random_scale:
-                    rand_scale = random.uniform(0.9, 1.1)
+                    rand_scale = random.uniform(1.2, 1.3)
                     w = int(rand_scale * w)
                     h = int(rand_scale * h)
                     render = render.resize((w, h), Image.BILINEAR)
                     mask = mask.resize((w, h), Image.NEAREST)
                     scale_intrinsic *= rand_scale
+                    scale_intrinsic[2, 2] = 1
                     scale_intrinsic[3, 3] = 1
+                else:
+                    rand_scale = 1
 
                 # random translate in the pixel space
                 if self.opt.random_trans:
@@ -209,14 +219,20 @@ class TrainDataset(Dataset):
                     dx = 0
                     dy = 0
 
-                trans_intrinsic[0, 3] = -dx / float(self.opt.loadSize // 2)
-                trans_intrinsic[1, 3] = -dy / float(self.opt.loadSize // 2)
-
                 x1 = int(round((w - tw) / 2.)) + dx
                 y1 = int(round((h - th) / 2.)) + dy
 
+                intrinsic[0, 2] -= (x1/rand_scale)
+                intrinsic[1, 2] -= (y1/rand_scale)
+
                 render = render.crop((x1, y1, x1 + tw, y1 + th))
                 mask = mask.crop((x1, y1, x1 + tw, y1 + th))
+
+                # random flip
+                if self.opt.random_flip and np.random.rand() > 0.5:
+                    scale_intrinsic[0, 0] *= -1
+                    render = transforms.RandomHorizontalFlip(p=1.0)(render)
+                    mask = transforms.RandomHorizontalFlip(p=1.0)(mask)
 
                 render = self.aug_trans(render)
 
@@ -226,8 +242,8 @@ class TrainDataset(Dataset):
                         np.random.uniform(0, self.opt.aug_blur))
                     render = render.filter(blur)
 
-            intrinsic = np.matmul(
-                trans_intrinsic, np.matmul(intrinsic, scale_intrinsic))
+            intrinsic = np.matmul(scale_intrinsic, intrinsic)
+            intrinsic[:2, :] *= (2/512)
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
@@ -246,7 +262,7 @@ class TrainDataset(Dataset):
             'img': torch.stack(render_list, dim=0),
             'calib': torch.stack(calib_list, dim=0),
             'extrinsic': torch.stack(extrinsic_list, dim=0),
-            'mask': torch.stack(mask_list, dim=0)
+            'mask': torch.stack(mask_list, dim=0),
         }
 
     def select_sampling_method(self, subject):
@@ -263,11 +279,13 @@ class TrainDataset(Dataset):
         # add random points within image space
         length = self.B_MAX - self.B_MIN
         random_points = np.random.rand(
-            self.num_sample_inout // 4, 3) * length + self.B_MIN
+            self.num_sample_inout // 3, 3) * length + self.B_MIN
         sample_points = np.concatenate([sample_points, random_points], 0)
         np.random.shuffle(sample_points)
 
-        inside = mesh.contains(sample_points)
+        sdf_f = SDF(mesh.vertices, mesh.faces)
+        inside = sdf_f(sample_points) > 0.
+        
         inside_points = sample_points[inside]
         outside_points = sample_points[np.logical_not(inside)]
 
