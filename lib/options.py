@@ -30,7 +30,7 @@ class BaseOptions():
         g_train.add_argument('--gpu_id', type=int, default=0, help='gpu id for cuda')
         g_train.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2, -1 for CPU mode')
 
-        g_train.add_argument('--num_threads', default=1, type=int, help='# sthreads for loading data')
+        g_train.add_argument('--num_threads', default=3, type=int, help='# sthreads for loading data')
         g_train.add_argument('--serial_batches', action='store_true',
                              help='if true, takes images in order to make batches, otherwise takes them randomly')
         g_train.add_argument('--pin_memory', action='store_true', help='pin_memory')
@@ -57,13 +57,18 @@ class BaseOptions():
 
         # Sampling related
         g_sample = parser.add_argument_group('Sampling')
-        g_sample.add_argument('--sigma', type=float, default=5.0, help='perturbation standard deviation for positions')
+        g_sample.add_argument('--sigma', type=float, default=0.03, help='perturbation standard deviation for positions')
 
         g_sample.add_argument('--num_sample_inout', type=int, default=5000, help='# of sampling points')
         g_sample.add_argument('--num_sample_color', type=int, default=0, help='# of sampling points')
 
         g_sample.add_argument('--z_size', type=float, default=200.0, help='z normalization factor')
 
+        g_sample.add_argument('--b_min', nargs=3, default=[-128, -28, -128], type=int,
+                              help='minimum xyz box coordinates of original mesh object')
+        g_sample.add_argument('--b_max', nargs=3, default=[128, 228, 128], type=int,
+                              help='maximum xyz box coordinates of original mesh object')
+        
         # Model related
         g_model = parser.add_argument_group('Model')
         # General

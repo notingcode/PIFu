@@ -18,8 +18,8 @@ class EvalDataset(Dataset):
 
     def __init__(self, opt, root=None):
         self.opt = opt
-        self.projection_mode = 'orthogonal'
-
+        self.projection_mode = self.opt.projection_mode
+        
         # Path setup
         self.root = self.opt.dataroot
         if root is not None:
