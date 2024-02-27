@@ -42,8 +42,8 @@ def reshape_sample_tensor(sample_tensor, num_views):
 
 
 def gen_mesh(opt, net, cuda, data, save_path, use_octree=True):
-    image_tensor = data['img'].to(device=cuda)
-    calib_tensor = data['calib'].to(device=cuda)
+    image_tensor = data['img'].to(device=cuda, dtype=torch.float32)
+    calib_tensor = data['calib'].to(device=cuda, dtype=torch.float32)
 
     net.filter(image_tensor)
 
@@ -60,7 +60,7 @@ def gen_mesh(opt, net, cuda, data, save_path, use_octree=True):
 
         verts, faces, _, _ = reconstruction(
             net, cuda, calib_tensor, opt.resolution, b_min, b_max, use_octree=use_octree)
-        verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=cuda).float()
+        verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=cuda, dtype=torch.float32)
         xyz_tensor = net.projection(verts_tensor, calib_tensor[:1])
         uv = xyz_tensor[:, :2, :]
         color = index(image_tensor[:1], uv).detach().cpu().numpy()[0].T

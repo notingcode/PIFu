@@ -29,7 +29,7 @@ def reconstruction(net, cuda, calib_tensor,
     def eval_func(points):
         points = np.expand_dims(points, axis=0)
         points = np.repeat(points, net.num_views, axis=0)
-        samples = torch.from_numpy(points).to(device=cuda).float()
+        samples = torch.from_numpy(points).to(device=cuda, dtype=torch.float32).float()
         net.query(samples, calib_tensor)
         pred = net.get_preds()[0][0]
         return pred.detach().cpu().numpy()
