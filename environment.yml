@@ -5,13 +5,13 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python=3.8
+  - python=3.11
   - pytorch=2.0.1
   - torchvision
   - torchaudio
   - ffmpeg
-  - imageio=2.34.0
-  - numpy<=1.23.1
+  - imageio>=2.34.0
+  - numpy
   - opencv
   - openexr
   - pillow
