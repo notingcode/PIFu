@@ -241,7 +241,7 @@ class TrainDataset(Dataset):
 
                 # random flip
                 if self.opt.random_flip and np.random.rand() > 0.5:
-                    scale_intrinsic[0, 0] *= -1 # flip fx, cx
+                    scale_intrinsic[0, 0] *= -1 # flip
                     render = transforms.RandomHorizontalFlip(p=1.0)(render)
                     mask = transforms.RandomHorizontalFlip(p=1.0)(mask)
 
@@ -254,7 +254,7 @@ class TrainDataset(Dataset):
                     render = render.filter(blur)
 
             intrinsic = np.matmul(scale_intrinsic, intrinsic)
-            intrinsic[:2, :] *= (self.final_img_scale/512)
+            intrinsic[:2, :] *= (self.final_img_scale/512) 
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
