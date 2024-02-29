@@ -37,6 +37,11 @@ class HGPIFuNet(BasePIFuNet):
 
         self.image_filter = HGFilter(opt)
 
+        if self.opt.projection_mode == "perspective":
+            self.img_boxsize = 2.0
+        else:
+            self.img_boxsize = 1.0
+
         self.surface_classifier = SurfaceClassifier(
             filter_channels=self.opt.mlp_dim,
             num_views=self.opt.num_views,
@@ -84,7 +89,7 @@ class HGPIFuNet(BasePIFuNet):
         xy = xyz[:, :2, :]
         z = xyz[:, 2:3, :]
 
-        in_img = (xy[:, 0] >= -1.0) & (xy[:, 0] <= 1.0) & (xy[:, 1] >= -1.0) & (xy[:, 1] <= 1.0)
+        in_img = (xy[:, 0] >= -self.img_boxsize) & (xy[:, 0] <= self.img_boxsize) & (xy[:, 1] >= -self.img_boxsize) & (xy[:, 1] <= self.img_boxsize)
 
         z_feat = self.normalizer(z, calibs=calibs)
 

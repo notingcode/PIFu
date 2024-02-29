@@ -82,6 +82,11 @@ class TrainDataset(Dataset):
         self.is_train = (phase == 'train')
         self.load_size = self.opt.loadSize
 
+        if self.opt.projection_mode == 'perspective':
+            self.final_img_scale = 2.0
+        else:
+            self.final_img_scale = 1.0
+
         self.num_views = self.opt.num_views
 
         self.num_sample_inout = self.opt.num_sample_inout
@@ -243,7 +248,7 @@ class TrainDataset(Dataset):
                     render = render.filter(blur)
 
             intrinsic = np.matmul(scale_intrinsic, intrinsic)
-            intrinsic[:2, :] *= (2/512)
+            intrinsic[:2, :] *= (self.final_img_scale/512) 
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
