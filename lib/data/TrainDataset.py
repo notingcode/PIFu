@@ -66,14 +66,10 @@ class TrainDataset(Dataset):
         self.RENDER = os.path.join(self.root, 'RENDER')
         self.MASK = os.path.join(self.root, 'MASK')
         self.PARAM = os.path.join(self.root, 'PARAM')
-        # Not used for learning geometry
-        self.UV_MASK = os.path.join(self.root, 'UV_MASK')
-        # Not used for learning geometry
-        self.UV_NORMAL = os.path.join(self.root, 'UV_NORMAL')
-        # Not used for learning geometry
-        self.UV_RENDER = os.path.join(self.root, 'UV_RENDER')
-        # Not used for learning geometry
-        self.UV_POS = os.path.join(self.root, 'UV_POS')
+        self.UV_MASK = os.path.join(self.root, 'UV_MASK') # Not used for learning geometry
+        self.UV_NORMAL = os.path.join(self.root, 'UV_NORMAL') # Not used for learning geometry
+        self.UV_RENDER = os.path.join(self.root, 'UV_RENDER') # Not used for learning geometry
+        self.UV_POS = os.path.join(self.root, 'UV_POS') # Not used for learning geometry
         self.OBJ = os.path.join(self.root, 'GEO', 'OBJ')
 
         self.B_MIN = np.array(self.opt.b_min)
@@ -82,6 +78,7 @@ class TrainDataset(Dataset):
         self.is_train = (phase == 'train')
         self.load_size = self.opt.loadSize
 
+        # 
         if self.opt.projection_mode == 'perspective':
             self.final_img_scale = 2.0
         else:
@@ -160,13 +157,14 @@ class TrainDataset(Dataset):
             # loading calibration data
             param = np.load(param_path, allow_pickle=True)
 
-            # Camera intrinsic and extrinsic directly from processed Hi4D data
+            # camera intrinsic and extrinsic directly from processed Hi4D data
             intrinsic = param.item().get('intrinsic')
             extrinsic = param.item().get('extrinsic')
             extrinsic = np.concatenate(
                 [extrinsic, np.array([0, 0, 0, 1]).reshape(1, 4)], 0)
 
-            # Match camera space to image pixel space
+            # match camera space to image pixel space
+            # scale_intrinsic scales intrinsic by rows, not columns
             scale_intrinsic = np.identity(4)
 
             mask = Image.open(mask_path).convert('L')
@@ -174,20 +172,25 @@ class TrainDataset(Dataset):
             
             original_img_width, original_img_height = render.size
             
-            max_dim = max(original_img_width, original_img_height)
+            max_dim = max(original_img_width, original_img_height) # find larger dimension of the image
             
+            # add paddings to make the image square
             mask = ImageOps.pad(mask, (max_dim, max_dim))
             render = ImageOps.pad(render, (max_dim, max_dim))
 
+            # reflecting image dimension change by also changing cx, cy
             if max_dim == original_img_height:
-                intrinsic[0, 2] += (max_dim - original_img_width)/2
+                intrinsic[0, 2] += (max_dim - original_img_width)/2 # change cx if width is increased by padding
             else:
-                intrinsic[1, 2] += (max_dim - original_img_height)/2
+                intrinsic[1, 2] += (max_dim - original_img_height)/2 # change cy if height is increased by padding
 
+            # change both image and mask to load_size
             mask = ImageOps.fit(mask, (self.load_size, self.load_size), method=Image.NEAREST)
             render = ImageOps.fit(render, (self.load_size, self.load_size), method=Image.BILINEAR)
-
+            
+            # reflect change in fx, fy, cx, cy from scaling image to load_size
             intrinsic[:2, :] *= (self.load_size/max_dim)
+            # to force change projection plane from ([0,...,load_size], [0,...,load_size]) to ([-load_size/2,...,load_size/2], [-load_size/2,...,load_size/2]
             intrinsic[:2, 2] -= self.load_size/2
 
             if self.is_train:
@@ -196,7 +199,7 @@ class TrainDataset(Dataset):
                 render = ImageOps.expand(render, pad_size, fill=0)
                 mask = ImageOps.expand(mask, pad_size, fill=0)
 
-                intrinsic[:2, 2] += pad_size
+                intrinsic[:2, 2] += pad_size # cx, cy changed by padding
 
                 w, h = render.size
                 th, tw = self.load_size, self.load_size
@@ -208,6 +211,7 @@ class TrainDataset(Dataset):
                     h = int(rand_scale * h)
                     render = render.resize((w, h), Image.BILINEAR)
                     mask = mask.resize((w, h), Image.NEAREST)
+                    # scale first and second row of intrinsic(fx,fy,skew,cx,cy)
                     scale_intrinsic *= rand_scale
                     scale_intrinsic[2, 2] = 1
                     scale_intrinsic[3, 3] = 1
@@ -227,15 +231,17 @@ class TrainDataset(Dataset):
                 x1 = int(round((w - tw) / 2.)) + dx
                 y1 = int(round((h - th) / 2.)) + dy
 
+                # shift cx, cy to reflect image translation
                 intrinsic[0, 2] -= (x1/rand_scale)
                 intrinsic[1, 2] -= (y1/rand_scale)
 
+                # translate image by cropping padded image
                 render = render.crop((x1, y1, x1 + tw, y1 + th))
                 mask = mask.crop((x1, y1, x1 + tw, y1 + th))
 
                 # random flip
                 if self.opt.random_flip and np.random.rand() > 0.5:
-                    scale_intrinsic[0, 0] *= -1
+                    scale_intrinsic[0, 0] *= -1 # flip fx, cx
                     render = transforms.RandomHorizontalFlip(p=1.0)(render)
                     mask = transforms.RandomHorizontalFlip(p=1.0)(mask)
 
@@ -248,7 +254,7 @@ class TrainDataset(Dataset):
                     render = render.filter(blur)
 
             intrinsic = np.matmul(scale_intrinsic, intrinsic)
-            intrinsic[:2, :] *= (self.final_img_scale/512) 
+            intrinsic[:2, :] *= (self.final_img_scale/512)
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
