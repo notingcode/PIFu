@@ -6,15 +6,13 @@ channels:
   - nvidia
 dependencies:
   - python=3.11
-  - pytorch=2.1.2=*cuda11.8* # remove cuda tag for macOS
+  - pytorch=2.1.2
   - torchvision
   - torchaudio
   - ffmpeg
   - imageio>=2.34.0
   - libjpeg-turbo
-  - libnvjpeg-dev # exclude it for macOS
   - numpy
-  - ocl-icd-system # exclude it for macOS
   - opencv
   - openexr
   - pillow
