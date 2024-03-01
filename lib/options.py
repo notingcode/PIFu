@@ -15,6 +15,7 @@ class BaseOptions():
         g_data.add_argument('--loadSize', type=int, default=512, help='load size of input image')
         g_data.add_argument('--yaw_list', nargs='+', default=[4, 16, 28, 40, 52, 64, 76, 88], type=int,
                             help='Specify the yaw index of view around all subject')
+        g_data.add_argument('--dataset_indexing', type=int, default=1, help='iterate dataset by given value')
 
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
