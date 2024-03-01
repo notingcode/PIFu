@@ -5,19 +5,18 @@ channels:
   - pytorch
   - nvidia
 dependencies:
-  - python=3.11
-  - pytorch=2.1.2=*cuda11.8* # remove cuda tag for macOS
-  - torchvision
-  - torchaudio
+  - python=3.8
+  - pytorch=*=*cuda11.7*
+  - torchvision=*=*cu117*
+  - torchaudio=*=*cu117*
   - ffmpeg
+  - freeglut
   - imageio>=2.34.0
-  - libjpeg-turbo
-  - libnvjpeg-dev # exclude it for macOS
-  - numpy
-  - ocl-icd-system # exclude it for macOS
+  - numpy<=1.23.1
   - opencv
   - openexr
   - pillow
+  - pyopengl
   - rtree
   - scikit-image
   - shapely
@@ -28,6 +27,3 @@ dependencies:
     - pyembree
     - pysdf
     - open3d
-    - pyopengl
-variables:
-  PYTORCH_ENABLE_MPS_FALLBACK: '1'
