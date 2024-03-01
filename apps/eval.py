@@ -34,21 +34,28 @@ class Evaluator:
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
         # set cuda
-        cuda = torch.device('cuda:%d' % opt.gpu_id) if torch.cuda.is_available() else torch.device('cpu')
+        if torch.cuda.is_available():
+            device_name = f'cuda:{opt.gpu_id}'
+        elif torch.backends.mps.is_available():
+            device_name = 'mps'
+        else:
+            device_name = 'cpu'
+        
+        torch_device = torch.device(device_name)
         # set projection mode
         projection_mode = opt.projection_mode
 
         # create net
-        netG = HGPIFuNet(opt, projection_mode).to(device=cuda)
+        netG = HGPIFuNet(opt, projection_mode).to(device=torch_device)
         print('Using Network: ', netG.name)
 
         if opt.load_netG_checkpoint_path:
-            netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=cuda))
+            netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=torch_device))
 
         if opt.load_netC_checkpoint_path is not None:
             print('loading for net C ...', opt.load_netC_checkpoint_path)
-            netC = ResBlkPIFuNet(opt).to(device=cuda)
-            netC.load_state_dict(torch.load(opt.load_netC_checkpoint_path, map_location=cuda))
+            netC = ResBlkPIFuNet(opt).to(device=torch_device)
+            netC.load_state_dict(torch.load(opt.load_netC_checkpoint_path, map_location=torch_device))
         else:
             netC = None
 
@@ -59,7 +66,7 @@ class Evaluator:
         with open(opt_log, 'w') as outfile:
             outfile.write(json.dumps(vars(opt), indent=2))
 
-        self.cuda = cuda
+        self.device = torch_device
         self.netG = netG
         self.netC = netC
 
@@ -102,9 +109,9 @@ class Evaluator:
                 self.netC.eval()
             save_path = '%s/%s/result_%s.obj' % (opt.results_path, opt.name, data['name'])
             if self.netC:
-                gen_mesh_color(opt, self.netG, self.netC, self.cuda, data, save_path, use_octree=use_octree)
+                gen_mesh_color(opt, self.netG, self.netC, self.device, data, save_path, use_octree=use_octree)
             else:
-                gen_mesh(opt, self.netG, self.cuda, data, save_path, use_octree=use_octree)
+                gen_mesh(opt, self.netG, self.device, data, save_path, use_octree=use_octree)
 
 
 if __name__ == '__main__':
