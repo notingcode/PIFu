@@ -16,7 +16,7 @@ from lib.sample_util import *
 from lib.train_util import *
 from lib.model import *
 
-from PIL import Image
+from PIL import Image, ImageOps
 import torchvision.transforms as transforms
 import glob
 import tqdm
@@ -74,19 +74,37 @@ class Evaluator:
         # Name
         img_name = os.path.splitext(os.path.basename(image_path))[0]
         # Calib
-        B_MIN = np.array([-1, -1, -1])
-        B_MAX = np.array([1, 1, 1])
+        B_MIN = np.array(self.opt.b_min)
+        B_MAX = np.array(self.opt.b_max)
         projection_matrix = np.identity(4)
         projection_matrix[1, 1] = -1
         calib = torch.Tensor(projection_matrix).float()
-        # Mask
+
+        # image and mask
+        image = Image.open(image_path).convert('RGB')
         mask = Image.open(mask_path).convert('L')
+
+        original_img_width, original_img_height = image.size
+
+        max_dim = max(original_img_width, original_img_height)
+
+        mask = ImageOps.pad(mask, (max_dim, max_dim))
+        image = ImageOps.pad(image, (max_dim, max_dim))
+
+        mask = ImageOps.fit(
+            mask, (self.load_size, self.load_size), method=Image.NEAREST)
+        image = ImageOps.fit(
+            image, (self.load_size, self.load_size), method=Image.BILINEAR)
+
+        mask.save("mask.png")
+        image.save("image.png")
+
         mask = transforms.Resize(self.load_size)(mask)
         mask = transforms.ToTensor()(mask).float()
-        # image
-        image = Image.open(image_path).convert('RGB')
+
         image = self.to_tensor(image)
         image = mask.expand_as(image) * image
+
         return {
             'name': img_name,
             'img': image.unsqueeze(0),
