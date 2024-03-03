@@ -13,7 +13,7 @@ from PIL import Image
 from tqdm import tqdm
 
 
-def reshape_multiview_tensors(image_tensor, calib_tensor):
+def reshape_multiview_tensors(image_tensor, calib_tensor, transforms_tensor=None):
     # Careful here! Because we put single view and multiview together,
     # the returned tensor.shape is 5-dim: [B, num_views, C, W, H]
     # So we need to convert it back to 4-dim [B*num_views, C, W, H]
@@ -29,8 +29,15 @@ def reshape_multiview_tensors(image_tensor, calib_tensor):
         calib_tensor.shape[2],
         calib_tensor.shape[3]
     )
+    
+    if transforms_tensor is not None:
+        transforms_tensor = transforms_tensor.view(
+            transforms_tensor.shape[0] * transforms_tensor.shape[1],
+            transforms_tensor.shape[2],
+            transforms_tensor.shape[3]
+        )
 
-    return image_tensor, calib_tensor
+    return image_tensor, calib_tensor, transforms_tensor
 
 
 def reshape_sample_tensor(sample_tensor, num_views):
@@ -48,8 +55,9 @@ def reshape_sample_tensor(sample_tensor, num_views):
 
 
 def gen_mesh(opt, net, cuda, data, save_path, use_octree=True):
-    image_tensor = data['img'].to(device=cuda)
-    calib_tensor = data['calib'].to(device=cuda)
+    image_tensor = data['img'].to(device=cuda, dtype=torch.float32)
+    calib_tensor = data['calib'].to(device=cuda, dtype=torch.float32)
+    transforms_tensor = data['transforms'].to(device=cuda, dtype=torch.float32)
 
     net.filter(image_tensor)
 
@@ -65,9 +73,9 @@ def gen_mesh(opt, net, cuda, data, save_path, use_octree=True):
         Image.fromarray(np.uint8(save_img[:,:,::-1])).save(save_img_path)
 
         verts, faces, _, _ = reconstruction(
-            net, cuda, calib_tensor, opt.resolution, b_min, b_max, use_octree=use_octree)
-        verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=cuda).float()
-        xyz_tensor = net.projection(verts_tensor, calib_tensor[:1])
+            net, cuda, calib_tensor, transforms_tensor, opt.resolution, b_min, b_max, use_octree=use_octree)
+        verts_tensor = torch.from_numpy(verts.T).unsqueeze(0).to(device=cuda, dtype=torch.float32)
+        xyz_tensor = net.projection(verts_tensor, calib_tensor[:1], transforms_tensor[:1])
         uv = xyz_tensor[:, :2, :]
         color = index(image_tensor[:1], uv).detach().cpu().numpy()[0].T
         color = color * 0.5 + 0.5
