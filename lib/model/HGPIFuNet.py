@@ -38,7 +38,7 @@ class HGPIFuNet(BasePIFuNet):
         self.image_filter = HGFilter(opt)
 
         if self.opt.projection_mode == "perspective":
-            self.img_boxsize = 3.5
+            self.img_boxsize = 2.5
         else:
             self.img_boxsize = 3.0
 
