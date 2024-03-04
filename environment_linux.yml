@@ -24,6 +24,6 @@ dependencies:
   - xxhash
   - pip
   - pip:
-    - pyembree
+    - trimesh[all]
     - pysdf
     - open3d
