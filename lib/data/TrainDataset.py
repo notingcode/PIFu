@@ -66,10 +66,14 @@ class TrainDataset(Dataset):
         self.RENDER = os.path.join(self.root, 'RENDER')
         self.MASK = os.path.join(self.root, 'MASK')
         self.PARAM = os.path.join(self.root, 'PARAM')
-        self.UV_MASK = os.path.join(self.root, 'UV_MASK') # Not used for learning geometry
-        self.UV_NORMAL = os.path.join(self.root, 'UV_NORMAL') # Not used for learning geometry
-        self.UV_RENDER = os.path.join(self.root, 'UV_RENDER') # Not used for learning geometry
-        self.UV_POS = os.path.join(self.root, 'UV_POS') # Not used for learning geometry
+        # Not used for learning geometry
+        self.UV_MASK = os.path.join(self.root, 'UV_MASK')
+        # Not used for learning geometry
+        self.UV_NORMAL = os.path.join(self.root, 'UV_NORMAL')
+        # Not used for learning geometry
+        self.UV_RENDER = os.path.join(self.root, 'UV_RENDER')
+        # Not used for learning geometry
+        self.UV_POS = os.path.join(self.root, 'UV_POS')
         self.OBJ = os.path.join(self.root, 'GEO', 'OBJ')
 
         self.B_MIN = np.array(self.opt.b_min)
@@ -78,7 +82,7 @@ class TrainDataset(Dataset):
         self.is_train = (phase == 'train')
         self.load_size = self.opt.loadSize
 
-        # 
+        # scaling based on projection mode
         if self.opt.projection_mode == 'perspective':
             self.final_img_scale = 2.0
         else:
@@ -116,7 +120,7 @@ class TrainDataset(Dataset):
             idx = int(subject)
             if idx % self.opt.dataset_indexing == 0:
                 train_subjects.append(subject)
-        
+
         var_subjects = np.loadtxt(os.path.join(
             self.root, 'val.txt'), dtype=str)
         if len(var_subjects) == 0:
@@ -154,6 +158,7 @@ class TrainDataset(Dataset):
         render_list = []
         mask_list = []
         extrinsic_list = []
+        transforms_list = []
 
         for vid in view_ids:
             param_path = os.path.join(self.PARAM, subject, f'{vid:02d}.npy')
@@ -169,31 +174,42 @@ class TrainDataset(Dataset):
             extrinsic = np.concatenate(
                 [extrinsic, np.array([0, 0, 0, 1]).reshape(1, 4)], 0)
 
+            if self.opt.projection_mode == 'orthogonal':
+                extrinsic_inv = np.matrix(extrinsic).I
+                extrinsic_inv[0,3] = -0.03581456
+                extrinsic_inv[2,3] = 0.00500571
+                extrinsic = extrinsic_inv.I
+
             # match camera space to image pixel space
             # scale_intrinsic scales intrinsic by rows, not columns
             scale_intrinsic = np.identity(4)
 
             mask = Image.open(mask_path).convert('L')
             render = Image.open(render_path).convert('RGB')
-            
+
             original_img_width, original_img_height = render.size
-            
-            max_dim = max(original_img_width, original_img_height) # find larger dimension of the image
-            
+
+            # find larger dimension of the image
+            max_dim = max(original_img_width, original_img_height)
+
             # add paddings to make the image square
             mask = ImageOps.pad(mask, (max_dim, max_dim))
             render = ImageOps.pad(render, (max_dim, max_dim))
 
             # reflecting image dimension change by also changing cx, cy
             if max_dim == original_img_height:
-                intrinsic[0, 2] += (max_dim - original_img_width)/2 # change cx if width is increased by padding
+                # change cx if width is increased by padding
+                intrinsic[0, 2] += (max_dim - original_img_width)/2
             else:
-                intrinsic[1, 2] += (max_dim - original_img_height)/2 # change cy if height is increased by padding
+                # change cy if height is increased by padding
+                intrinsic[1, 2] += (max_dim - original_img_height)/2
 
             # change both image and mask to load_size
-            mask = ImageOps.fit(mask, (self.load_size, self.load_size), method=Image.NEAREST)
-            render = ImageOps.fit(render, (self.load_size, self.load_size), method=Image.BILINEAR)
-            
+            mask = ImageOps.fit(
+                mask, (self.load_size, self.load_size), method=Image.NEAREST)
+            render = ImageOps.fit(
+                render, (self.load_size, self.load_size), method=Image.BILINEAR)
+
             # reflect change in fx, fy, cx, cy from scaling image to load_size
             intrinsic[:2, :] *= (self.load_size/max_dim)
             # to force change projection plane from ([0,...,load_size], [0,...,load_size]) to ([-load_size/2,...,load_size/2], [-load_size/2,...,load_size/2]
@@ -218,9 +234,7 @@ class TrainDataset(Dataset):
                     render = render.resize((w, h), Image.BILINEAR)
                     mask = mask.resize((w, h), Image.NEAREST)
                     # scale first and second row of intrinsic(fx,fy,skew,cx,cy)
-                    scale_intrinsic *= rand_scale
-                    scale_intrinsic[2, 2] = 1
-                    scale_intrinsic[3, 3] = 1
+                    scale_intrinsic[:2, :] *= rand_scale
                 else:
                     rand_scale = 1
 
@@ -260,7 +274,7 @@ class TrainDataset(Dataset):
                     render = render.filter(blur)
 
             intrinsic = np.matmul(scale_intrinsic, intrinsic)
-            intrinsic[:2, :] *= (self.final_img_scale/512) 
+
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
@@ -271,7 +285,16 @@ class TrainDataset(Dataset):
             render = self.to_tensor(render)
             render = mask.expand_as(render) * render
 
+            transforms_matrix = np.asarray([[self.final_img_scale/self.load_size, 0, 0],
+                                            [0, self.final_img_scale/self.load_size, 0]])
+
+            # transforms_matrix = np.asarray([[1, 0, 0],
+            #                                 [0, 1, 0]])
+
+            transforms_tensor = torch.Tensor(transforms_matrix)
+
             render_list.append(render)
+            transforms_list.append(transforms_tensor)
             calib_list.append(calib)
             extrinsic_list.append(extrinsic)
 
@@ -280,6 +303,7 @@ class TrainDataset(Dataset):
             'calib': torch.stack(calib_list, dim=0),
             'extrinsic': torch.stack(extrinsic_list, dim=0),
             'mask': torch.stack(mask_list, dim=0),
+            'transforms': torch.stack(transforms_list, dim=0)
         }
 
     def select_sampling_method(self, subject):
@@ -302,7 +326,7 @@ class TrainDataset(Dataset):
 
         sdf_f = SDF(mesh.vertices, mesh.faces)
         inside = sdf_f(sample_points) > 0.
-        
+
         inside_points = sample_points[inside]
         outside_points = sample_points[np.logical_not(inside)]
 
