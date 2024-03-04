@@ -15,12 +15,11 @@ log = logging.getLogger('trimesh')
 log.setLevel(40)
 
 
-def load_trimesh(root_dir):
-    folders = os.listdir(root_dir)
+def load_trimesh(root_dir, subjects):
     meshs = {}
-    for folder_name in folders:
-        meshs[folder_name] = trimesh.load(os.path.join(root_dir, folder_name, f'{folder_name}.obj'),
-                                          force='mesh')
+    for subject_id in subjects:
+        meshs[subject_id] = trimesh.load(os.path.join(root_dir, subject_id, f'{subject_id}.obj'),
+                                         force='mesh')
 
     return meshs
 
@@ -111,7 +110,7 @@ class TrainDataset(Dataset):
                                    hue=opt.aug_hue)
         ])
 
-        self.mesh_dic = load_trimesh(self.OBJ)
+        self.mesh_dic = load_trimesh(self.OBJ, self.subjects)
 
     def get_subjects(self):
         all_subjects = os.listdir(self.RENDER)
@@ -176,8 +175,8 @@ class TrainDataset(Dataset):
 
             if self.opt.projection_mode == 'orthogonal':
                 extrinsic_inv = np.matrix(extrinsic).I
-                extrinsic_inv[0,3] = -0.03581456
-                extrinsic_inv[2,3] = 0.00500571
+                extrinsic_inv[0, 3] = -0.03581456
+                extrinsic_inv[2, 3] = 0.00500571
                 extrinsic = extrinsic_inv.I
 
             # match camera space to image pixel space
@@ -221,7 +220,7 @@ class TrainDataset(Dataset):
                 render = ImageOps.expand(render, pad_size, fill=0)
                 mask = ImageOps.expand(mask, pad_size, fill=0)
 
-                intrinsic[:2, 2] += pad_size # cx, cy changed by padding
+                intrinsic[:2, 2] += pad_size  # cx, cy changed by padding
 
                 w, h = render.size
                 th, tw = self.load_size, self.load_size
@@ -261,7 +260,7 @@ class TrainDataset(Dataset):
 
                 # random flip
                 if self.opt.random_flip and np.random.rand() > 0.5:
-                    scale_intrinsic[0, 0] *= -1 # flip
+                    scale_intrinsic[0, 0] *= -1  # flip
                     render = transforms.RandomHorizontalFlip(p=1.0)(render)
                     mask = transforms.RandomHorizontalFlip(p=1.0)(mask)
 
