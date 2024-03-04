@@ -23,10 +23,14 @@ opt = BaseOptions().parse()
 
 def train(opt):
     # set cuda
-    if torch.has_cuda:
-        my_device = torch.device('cuda:%d' % opt.gpu_id)
-    elif torch.has_mps:
-        my_device = torch.device('mps')
+    if torch.cuda.is_available():
+        device_name = f'cuda:{opt.gpu_id}'
+    elif torch.backends.mps.is_available():
+        device_name = 'mps'
+    else:
+        device_name = 'cpu'
+
+    used_device = torch.device(device_name)
 
     train_dataset = TrainDataset(opt, phase='train')
     test_dataset = TrainDataset(opt, phase='test')
@@ -47,7 +51,7 @@ def train(opt):
     print('test data size: ', len(test_data_loader))
 
     # create net
-    netG = HGPIFuNet(opt, projection_mode).to(device=my_device)
+    netG = HGPIFuNet(opt, projection_mode).to(device=used_device)
     optimizerG = torch.optim.RMSprop(netG.parameters(), lr=opt.learning_rate, momentum=0, weight_decay=0)
     lr = opt.learning_rate
     print('Using Network: ', netG.name)
@@ -61,7 +65,7 @@ def train(opt):
     # load checkpoints
     if opt.load_netG_checkpoint_path is not None:
         print('loading for net G ...', opt.load_netG_checkpoint_path)
-        netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=my_device))
+        netG.load_state_dict(torch.load(opt.load_netG_checkpoint_path, map_location=used_device))
 
     if opt.continue_train:
         if opt.resume_epoch < 0:
@@ -69,7 +73,7 @@ def train(opt):
         else:
             model_path = '%s/%s/netG_epoch_%d' % (opt.checkpoints_path, opt.name, opt.resume_epoch)
         print('Resuming from ', model_path)
-        netG.load_state_dict(torch.load(model_path, map_location=my_device))
+        netG.load_state_dict(torch.load(model_path, map_location=used_device))
 
     os.makedirs(opt.checkpoints_path, exist_ok=True)
     os.makedirs(opt.results_path, exist_ok=True)
@@ -91,18 +95,19 @@ def train(opt):
             iter_start_time = time.time()
 
             # retrieve the data
-            image_tensor = train_data['img'].to(device=my_device)
-            calib_tensor = train_data['calib'].to(device=my_device)
-            sample_tensor = train_data['samples'].to(device=my_device)
+            image_tensor = train_data['img'].to(device=used_device)
+            calib_tensor = train_data['calib'].to(device=used_device)
+            sample_tensor = train_data['samples'].to(device=used_device)
+            transforms_tensor = train_data['transforms'].to(device=used_device)
 
-            image_tensor, calib_tensor = reshape_multiview_tensors(image_tensor, calib_tensor)
+            image_tensor, calib_tensor, transforms_tensor = reshape_multiview_tensors(image_tensor, calib_tensor, transforms_tensor)
 
             if opt.num_views > 1:
                 sample_tensor = reshape_sample_tensor(sample_tensor, opt.num_views)
+                
+            label_tensor = train_data['labels'].to(device=used_device)
 
-            label_tensor = train_data['labels'].to(device=my_device)
-
-            res, error = netG.forward(image_tensor, sample_tensor, calib_tensor, labels=label_tensor)
+            res, error = netG.forward(image_tensor, sample_tensor, calib_tensor, transforms_tensor, label_tensor)
 
             optimizerG.zero_grad()
             error.backward()
@@ -142,7 +147,7 @@ def train(opt):
             if not opt.no_num_eval:
                 test_losses = {}
                 print('calc error (test) ...')
-                test_errors = calc_error(opt, netG, my_device, test_dataset, 100)
+                test_errors = calc_error(opt, netG, used_device, test_dataset, 100)
                 print('eval test MSE: {0:06f} IOU: {1:06f} prec: {2:06f} recall: {3:06f}'.format(*test_errors))
                 MSE, IOU, prec, recall = test_errors
                 test_losses['MSE(test)'] = MSE
@@ -152,7 +157,7 @@ def train(opt):
 
                 print('calc error (train) ...')
                 train_dataset.is_train = False
-                train_errors = calc_error(opt, netG, my_device, train_dataset, 100)
+                train_errors = calc_error(opt, netG, used_device, train_dataset, 100)
                 train_dataset.is_train = True
                 print('eval train MSE: {0:06f} IOU: {1:06f} prec: {2:06f} recall: {3:06f}'.format(*train_errors))
                 MSE, IOU, prec, recall = train_errors
@@ -167,7 +172,7 @@ def train(opt):
                     test_data = random.choice(test_dataset)
                     save_path = '%s/%s/test_eval_epoch%d_%s.obj' % (
                         opt.results_path, opt.name, epoch, test_data['name'])
-                    gen_mesh(opt, netG, my_device, test_data, save_path)
+                    gen_mesh(opt, netG, used_device, test_data, save_path)
 
                 print('generate mesh (train) ...')
                 train_dataset.is_train = False
@@ -175,7 +180,7 @@ def train(opt):
                     train_data = random.choice(train_dataset)
                     save_path = '%s/%s/train_eval_epoch%d_%s.obj' % (
                         opt.results_path, opt.name, epoch, train_data['name'])
-                    gen_mesh(opt, netG, my_device, train_data, save_path)
+                    gen_mesh(opt, netG, used_device, train_data, save_path)
                 train_dataset.is_train = True
 
 
