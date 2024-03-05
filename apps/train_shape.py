@@ -40,14 +40,16 @@ def train(opt):
     # create data loader
     train_data_loader = DataLoader(train_dataset,
                                    batch_size=opt.batch_size, shuffle=not opt.serial_batches,
-                                   num_workers=opt.num_threads, pin_memory=opt.pin_memory)
+                                   num_workers=opt.num_threads, pin_memory=opt.pin_memory,
+                                   timeout=30, prefetch_factor=4)
 
     print('train data size: ', len(train_data_loader))
 
     # NOTE: batch size should be 1 and use all the points for evaluation
     test_data_loader = DataLoader(test_dataset,
                                   batch_size=1, shuffle=False,
-                                  num_workers=opt.num_threads, pin_memory=opt.pin_memory)
+                                  num_workers=opt.num_threads, pin_memory=opt.pin_memory,
+                                  timeout=30, prefetch_factor=4)
     print('test data size: ', len(test_data_loader))
 
     # create net
@@ -125,17 +127,19 @@ def train(opt):
                                                                             iter_net_time - iter_start_time, int(eta // 60),
                         int(eta - 60 * (eta // 60))))
 
-            if train_idx % opt.freq_save == 0 and train_idx != 0:
-                torch.save(netG.state_dict(), '%s/%s/netG_latest' % (opt.checkpoints_path, opt.name))
-                torch.save(netG.state_dict(), '%s/%s/netG_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
+            # if train_idx % opt.freq_save == 0 and train_idx != 0:
+            #     torch.save(netG.state_dict(), '%s/%s/netG_latest' % (opt.checkpoints_path, opt.name))
+            #     torch.save(netG.state_dict(), '%s/%s/netG_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
 
-            if train_idx % opt.freq_save_ply == 0:
-                save_path = '%s/%s/pred.ply' % (opt.results_path, opt.name)
-                r = res[0].cpu()
-                points = sample_tensor[0].transpose(0, 1).cpu()
-                save_samples_truncted_prob(save_path, points.detach().numpy(), r.detach().numpy())
+            # if train_idx % opt.freq_save_ply == 0:
+            #     save_path = '%s/%s/pred.ply' % (opt.results_path, opt.name)
+            #     r = res[0].cpu()
+            #     points = sample_tensor[0].transpose(0, 1).cpu()
+            #     save_samples_truncted_prob(save_path, points.detach().numpy(), r.detach().numpy())
 
             iter_data_time = time.time()
+
+        torch.save(netG.state_dict(), '%s/%s/netG_epoch_%d' % (opt.checkpoints_path, opt.name, epoch))
 
         # update learning rate
         lr = adjust_learning_rate(optimizerG, epoch, lr, opt.schedule, opt.gamma)
@@ -166,10 +170,10 @@ def train(opt):
                 test_losses['prec(train)'] = prec
                 test_losses['recall(train)'] = recall
 
-            if not opt.no_gen_mesh:
+            if not opt.no_gen_mesh and epoch != 0 and (epoch % (opt.gen_mesh_freq-1) == 0):
                 print('generate mesh (test) ...')
-                for gen_idx in tqdm(range(opt.num_gen_mesh_test)):
-                    test_data = random.choice(test_dataset)
+                for gen_idx in tqdm(range(len(test_dataset))):
+                    test_data = test_dataset.get_item(gen_idx)
                     save_path = '%s/%s/test_eval_epoch%d_%s.obj' % (
                         opt.results_path, opt.name, epoch, test_data['name'])
                     gen_mesh(opt, netG, used_device, test_data, save_path)
