@@ -115,20 +115,22 @@ class TrainDataset(Dataset):
     def get_subjects(self):
         all_subjects = os.listdir(self.RENDER)
         train_subjects = []
+        val_subjects = []
+        
         for subject in all_subjects:
             idx = int(subject)
-            if idx % self.opt.dataset_indexing == 0:
+            if idx % self.opt.train_dataset_indexing == 0:
                 train_subjects.append(subject)
+            if idx % self.opt.test_dataset_indexing == 0:
+                val_subjects.append(subject)
 
-        var_subjects = np.loadtxt(os.path.join(
-            self.root, 'val.txt'), dtype=str)
-        if len(var_subjects) == 0:
+        if self.opt.test_dataset_indexing == -1:
             return train_subjects
 
         if self.is_train:
-            return sorted(list(set(train_subjects) - set(var_subjects)))
+            return sorted(list(set(train_subjects) - set(val_subjects)))
         else:
-            return sorted(list(var_subjects))
+            return sorted(list(val_subjects))
 
     def __len__(self):
         return len(self.subjects) * len(self.yaw_list) * len(self.pitch_list)
@@ -273,7 +275,6 @@ class TrainDataset(Dataset):
                     render = render.filter(blur)
 
             intrinsic = np.matmul(scale_intrinsic, intrinsic)
-
             calib = torch.Tensor(np.matmul(intrinsic, extrinsic)).float()
             extrinsic = torch.Tensor(extrinsic).float()
 
@@ -312,19 +313,19 @@ class TrainDataset(Dataset):
             torch.manual_seed(1991)
         mesh = self.mesh_dic[subject]
         surface_points, _ = trimesh.sample.sample_surface(
-            mesh, 4 * self.num_sample_inout)
+            mesh, 8 * self.num_sample_inout)
         sample_points = surface_points + \
             np.random.normal(scale=self.opt.sigma, size=surface_points.shape)
 
         # add random points within image space
         length = self.B_MAX - self.B_MIN
         random_points = np.random.rand(
-            self.num_sample_inout // 3, 3) * length + self.B_MIN
+            self.num_sample_inout // 4, 3) * length + self.B_MIN
         sample_points = np.concatenate([sample_points, random_points], 0)
         np.random.shuffle(sample_points)
 
         sdf_f = SDF(mesh.vertices, mesh.faces)
-        inside = sdf_f(sample_points) > 0.
+        inside = sdf_f(sample_points, n_threads=4) > 0.
 
         inside_points = sample_points[inside]
         outside_points = sample_points[np.logical_not(inside)]
