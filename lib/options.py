@@ -15,7 +15,8 @@ class BaseOptions():
         g_data.add_argument('--loadSize', type=int, default=512, help='load size of input image')
         g_data.add_argument('--yaw_list', nargs='+', default=[4, 16, 28, 40, 52, 64, 76, 88], type=int,
                             help='Specify the yaw index of view around all subject')
-        g_data.add_argument('--dataset_indexing', type=int, default=1, help='iterate dataset by given value')
+        g_data.add_argument('--train_dataset_indexing', type=int, default=1, help='iterate dataset by given value')
+        g_data.add_argument('--test_dataset_indexing', type=int, default=-1, help='iterate dataset by given value')
 
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
@@ -31,19 +32,19 @@ class BaseOptions():
         g_train.add_argument('--gpu_id', type=int, default=0, help='gpu id for cuda')
         g_train.add_argument('--gpu_ids', type=str, default='0', help='gpu ids: e.g. 0  0,1,2, 0,2, -1 for CPU mode')
 
-        g_train.add_argument('--num_threads', default=3, type=int, help='# sthreads for loading data')
+        g_train.add_argument('--num_threads', default=6, type=int, help='# sthreads for loading data')
         g_train.add_argument('--serial_batches', action='store_true',
                              help='if true, takes images in order to make batches, otherwise takes them randomly')
         g_train.add_argument('--pin_memory', action='store_true', help='pin_memory')
         
         g_train.add_argument('--batch_size', type=int, default=1, help='input batch size')
-        g_train.add_argument('--learning_rate', type=float, default=1e-3, help='adam learning rate')
+        g_train.add_argument('--learning_rate', type=float, default=5e-3, help='adam learning rate')
         g_train.add_argument('--learning_rateC', type=float, default=1e-3, help='adam learning rate')
         g_train.add_argument('--num_epoch', type=int, default=100, help='num epoch to train')
 
-        g_train.add_argument('--freq_plot', type=int, default=10, help='freqency of the error plot')
-        g_train.add_argument('--freq_save', type=int, default=50, help='freqency of the save_checkpoints')
-        g_train.add_argument('--freq_save_ply', type=int, default=100, help='freqency of the save ply')
+        g_train.add_argument('--freq_plot', type=int, default=50, help='freqency of the error plot')
+        g_train.add_argument('--freq_save', type=int, default=1000, help='freqency of the save_checkpoints')
+        g_train.add_argument('--freq_save_ply', type=int, default=500, help='freqency of the save ply')
        
         g_train.add_argument('--no_gen_mesh', action='store_true')
         g_train.add_argument('--no_num_eval', action='store_true')
@@ -55,6 +56,7 @@ class BaseOptions():
         g_test = parser.add_argument_group('Testing')
         g_test.add_argument('--resolution', type=int, default=256, help='# of grid in mesh reconstruction')
         g_test.add_argument('--test_folder_path', type=str, default=None, help='the folder of test image')
+        g_test.add_argument('--gen_mesh_freq', type=int, default=50, help='mesh generation frequency')
 
         # Sampling related
         g_sample = parser.add_argument_group('Sampling')
@@ -65,9 +67,9 @@ class BaseOptions():
 
         g_sample.add_argument('--z_size', type=float, default=200.0, help='z normalization factor')
 
-        g_sample.add_argument('--b_min', nargs=3, default=[-128, -28, -128], type=int,
+        g_sample.add_argument('--b_min', nargs=3, default=[-128, -28, -128], type=float,
                               help='minimum xyz box coordinates of original mesh object')
-        g_sample.add_argument('--b_max', nargs=3, default=[128, 228, 128], type=int,
+        g_sample.add_argument('--b_max', nargs=3, default=[128, 228, 128], type=float,
                               help='maximum xyz box coordinates of original mesh object')
         
         # Model related
