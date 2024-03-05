@@ -79,6 +79,8 @@ class Evaluator:
         projection_matrix = np.identity(4)
         projection_matrix[1, 1] = -1
         calib = torch.Tensor(projection_matrix).float()
+        transforms_matrix = torch.Tensor([[1/512,0,0],
+                                          [0,1/512,0]]).float()
 
         # image and mask
         image = Image.open(image_path).convert('RGB')
@@ -109,6 +111,7 @@ class Evaluator:
             'name': img_name,
             'img': image.unsqueeze(0),
             'calib': calib.unsqueeze(0),
+            'transforms': transforms_matrix.unsqueeze(0),
             'mask': mask.unsqueeze(0),
             'b_min': B_MIN,
             'b_max': B_MAX,
