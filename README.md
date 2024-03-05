@@ -1,7 +1,7 @@
 # PIFu-Hi4D: Pixel-Aligned Implicit Function for High-Resolution Clothed Human Digitization
 
 ```bash
-python -m apps.train_shape --dataroot 'dataset-path' --random_flip --random_scale --random_trans --num_views 8 --batch_size 1 --b_min -2 -1 -2 --b_max 2 3 2 --num_epoch 10 --sigma 0.05 --z_size 250 --num_sample_inout 20000 --freq_save 1
+python -m apps.train_shape --dataroot 'dataset_abspath' --random_flip --random_scale --random_trans --num_views 1 --batch_size 10 --random_multiview --b_min -1.1 0 -1.1 --b_max 1.1 2.2 1.1 --num_epoch 50 --sigma 0.05 --z_size 350 --num_sample_inout 6000 --train_dataset_indexing 10 --test_dataset_indexing 85 --no_num_eval
 ```
 
 [![report](https://img.shields.io/badge/arxiv-report-red)](https://arxiv.org/abs/1905.05172) [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1GFSsqP2BWz4gtq0e-nki00ZHSirXwFyY)
